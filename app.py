@@ -1,14 +1,14 @@
 import pandas as pd
 import numpy as np
 import random, json
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from flask import Flask, render_template, request
-from python import getRecommendation
+# from python import getRecommendation
 
 app = Flask(__name__)
 
-df = pd.read_csv("books.csv")
+df = pd.read_csv("dataset.csv")
 
 def setChoices():
     genres = df.genre.unique()
@@ -16,17 +16,11 @@ def setChoices():
     custom = df[["image", "Title", "genre", "ratingsCount"]]
 
     fiction = custom.loc[random.choice(custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[0])].index)]
-    # sports = custom.loc[random.choice(custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[1])].index)]  
     music =custom.loc[random.choice(custom.loc[(custom.ratingsCount > 900) & (custom.genre == genres[2])].index)]   
     travel = custom.loc[random.choice(custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[3])].index)]
     youndAdultFiction = custom.loc[random.choice(custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[4])].index)]
     humour = custom.loc[random.choice(custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[5])].index)]
-    # drama = custom.loc[(custom.ratingsCount > 900) & (custom.genre == genres[6])]
     adventure = custom.loc[random.choice(custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[7])].index)]
-    # # crime = custom.loc[(custom.ratingsCount > 900) & (custom.genre == genres[8])]
-    # # romances = custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[9])]
-    # # miliraty = custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[10])]
-    # horror = custom.loc[(custom.ratingsCount > 2000) & (custom.genre == genres[11])]
     topgenres = [fiction, music, travel, youndAdultFiction, humour, adventure]
 
     randomSamples = random.sample(topgenres, 5)
@@ -37,34 +31,22 @@ def setChoices():
         dictionary[i] = randomSamples[i]
     return dictionary
 
-# def getRecommendations(personality, favorite_books):
-#     try:
-#         if personality == 'Introvert':
-#             genres = ['fiction', 'travel', 'drama']
-#         else:
-#             genres = ['sports & recreation', 'music', 'adventure stories']
-#         df_filtered = df[df['genre'].isin(genres)]
+def getRecommendation(personality, user_favorites):
+    if personality == 'introvert':
+        df = df[df['introvert'] == 1]
+    else:
+        df = df[df['extrovert'] == 1]
 
-#         tfidf = TfidfVectorizer(stop_words='english')
-#         tfidf_matrix = tfidf.fit_transform(df_filtered['description'])
+    vectorizer = CountVectorizer()
+    title_vectors = vectorizer.fit_transform(df['Title'])
 
-#         favorite_books_descriptions = df_filtered[df_filtered['Title'].isin(favorite_books)]['description']
-#         favorite_books_tfidf = tfidf.transform(favorite_books_descriptions)
-#         cosine_similarities = cosine_similarity(favorite_books_tfidf, tfidf_matrix)
+    user_vectors = vectorizer.transform(user_favorites)
 
-#         similar_books_indices = cosine_similarities.argsort()[0][::-1]
-#         similar_books = df_filtered.iloc[similar_books_indices]
+    similarity_scores = cosine_similarity(user_vectors, title_vectors)
 
-#         # print(similar_books["genre"].value_counts())
-
-#     except ValueError:
-#         pass
-
-#     # recommendations = {
-#     #     "books": str(similar_books.to_dict()),
-#     #     "status": "success"
-#     # }
-#     return similar_books.to_dict()
+    recommendations_indices = similarity_scores.argsort()[0][::-1]
+    recommendations = df.iloc[recommendations_indices]
+    return recommendations
 
 @app.route('/')
 def home():
@@ -113,15 +95,30 @@ def getPreferences():
     userPreferences = request.get_json()
     
     favorite_books = list(userPreferences["books"])
-    personality = str(userPreferences["personality"])
+    personality = str(userPreferences["personality"]).lower()
 
     print(favorite_books, personality)
 
-    # result = getRecommendation(personality, favorite_books)
+    if personality == 'introvert':
+        d = df[df['introvert'] == 1]
+    else:
+        d = df[df['extrovert'] == 1]
 
-    # # print(result["Title"][0], result["description"][0], result["authors"][0], result["genre"][0])
+    vectorizer = CountVectorizer()
+    title_vectors = vectorizer.fit_transform(d['Title'])
+
+    user_vectors = vectorizer.transform(favorite_books)
+
+    similarity_scores = cosine_similarity(user_vectors, title_vectors)
+
+    recommendations_indices = similarity_scores.argsort()[0][::-1]
+    recommendations = d.iloc[recommendations_indices]
+
+    context = (recommendations.to_dict(orient='records'))
+
+    print(context)
     
-    return "Received"
+    return render_template('recommendation.html', **context)
 
 if __name__ == "__main__":
     app.run(debug=True)
