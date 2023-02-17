@@ -117,8 +117,8 @@ def getPreferences():
     context = (recommendations.to_dict(orient='records'))
 
     print(context)
-    
-    return render_template('recommendation.html', **context)
+    return context
+    # return render_template('recommendation.html', **context)
 
 if __name__ == "__main__":
     app.run(debug=True)
